@@ -25,6 +25,12 @@ function _draw()
 	for msg in all(_debug_msgs) do
 		print("\#0\f7"..tostr(msg))
 	end
+	
+	local camy=plr.y-58
+	if camy > 0 then
+		camy=0
+	end
+	camera(0,camy)
 end
 -->8
 -- player
