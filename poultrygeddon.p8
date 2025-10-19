@@ -13,7 +13,18 @@ function _draw()
 	cls()
 	
 	map()
+	
 	plr_draw(plr)
+	
+	-- debug
+	-- draw collision points
+	for c in all(plr_get_collision_coords(plr)) do
+		line(c.x,c.y,c.x,c.y,8)
+	end
+	
+	for msg in all(_debug_msgs) do
+		print("\#0\f7"..tostr(msg))
+	end
 end
 -->8
 -- player
@@ -38,7 +49,7 @@ function plr_new(x,y)
 	
 	local ani_running=
 		plr_mk_ani_running(plr)
-	plr.ani_running = ani_running
+	plr.ani_running=ani_running
 	
 	return plr
 end
@@ -49,7 +60,10 @@ function plr_update(plr)
 				btn(⬅️) or
 				btn(⬆️) or
 				btn(⬇️) then
+		local original_x=plr.x
+		local original_y=plr.y
 		plr.is_running=true
+		
 
 		-- move x --
 		if btn(➡️) then
@@ -65,6 +79,14 @@ function plr_update(plr)
 			plr.y-=1
 		elseif btn(⬇️) then
 			plr.y+=1
+		end
+		
+		-- if player collides
+		-- with map, reset it to
+		-- original coords
+		if plr_collides_with_map(plr) then
+			plr.x=original_x
+			plr.y=original_y
 		end
 	else -- not moving --
 		plr.is_running=false
@@ -109,7 +131,7 @@ end
 function plr_collision_rect(plr)
 	local r={}
 	
-	-- special props --
+	-- boundary props --
 	r.top=plr.y+7
 	r.bottom=plr.y+plr.h
 	r.left=plr.x+5
@@ -120,8 +142,53 @@ function plr_collision_rect(plr)
 	r.y=r.top
 	r.w=r.right-r.left
 	r.h=r.bottom-r.top
+	r.cx=r.x+(r.w/2) -- center x
+	r.cy=r.y+(r.h/2) -- center y
+	
+	-- points --
+	r.top_left={x=r.x,y=r.y}
+	r.top_center={x=r.cx,y=r.y}
+	r.top_right={x=r.right,y=r.y}
+	r.center_left={x=r.x,y=r.cy}
+	r.center={x=r.cx,y=r.cy}
+	r.center_right={x=r.right,y=r.cy}
+	r.bottom_left={x=r.x,y=r.bottom}
+	r.bottom_center={x=r.cx,y=r.bottom}
+	r.bottom_right={x=r.right,y=r.bottom}
 	
 	return r
+end
+
+function plr_get_collision_coords(plr)
+	local pr=plr_collision_rect(plr) -- player rect
+	local coords={}
+	
+	add(coords, pr.top_left)
+	add(coords, pr.top_center)
+	add(coords, pr.top_right)
+	add(coords, pr.center_left)
+	add(coords, pr.center)
+	add(coords, pr.center_right)
+	add(coords, pr.bottom_left)
+	add(coords, pr.bottom_center)
+	add(coords, pr.bottom_right)
+	
+	return coords
+end
+
+function plr_collides_with_map(plr)
+	local coords=plr_get_collision_coords(plr)
+
+	for c in all(coords) do
+		local m=mget(c.x/8, c.y/8)
+		local collides=fget(m,0)
+		
+		if collides then
+			return true
+		end
+	end
+	
+	return false
 end
 -->8
 -- utils
@@ -195,6 +262,26 @@ function ani_update(ani)
 	-- run current frame
 	local fn=ani.frames[ani.frame]
 	fn()
+end
+
+function clone(obj)
+  if type(obj) ~= "table" then
+    return obj
+  end
+
+  local newobj = {}
+  for k, v in pairs(obj) do
+    newobj[k] = clone(v) -- recursively clone nested tables
+  end
+  return newobj
+end
+
+_debug_msgs={}
+function debug(str)
+	add(_debug_msgs, str)
+	if #_debug_msgs>10 then
+		del(_debug_msgs,_debug_msgs[1])
+	end
 end
 __gfx__
 00000000000499099000000000049909900000000004990990000000000499099000000000049909900000000000000000000000000000000000000000000000
