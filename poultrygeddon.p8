@@ -74,6 +74,10 @@ function plr_update(plr)
 			plr.face_left=true
 		end
 		
+		if plr_collides_with_map(plr) then
+			plr.x=original_x
+		end
+		
 		-- move y --
 		if btn(⬆️) then
 			plr.y-=1
@@ -81,13 +85,10 @@ function plr_update(plr)
 			plr.y+=1
 		end
 		
-		-- if player collides
-		-- with map, reset it to
-		-- original coords
 		if plr_collides_with_map(plr) then
-			plr.x=original_x
 			plr.y=original_y
 		end
+		
 	else -- not moving --
 		plr.is_running=false
 	end -- end of moving --
