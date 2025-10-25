@@ -7,11 +7,29 @@ function _init()
 		x=plr.x-(screen_size/2),
 		y=plr.y-(screen_size/2),
 	}
+	enemies={}
+	dlt=0
 end
 
 function _update60()
+	dlt+=1
+	
+	if dlt>=max_int then
+		dlt=1
+	end
+	
+	-- create an enemy
+	-- every 2 secs
+	if dlt%120==0 then
+		add(enemies, enm_new(cam))
+	end
+	
 	plr_update(plr)
 	cam_follow(cam,plr)
+	
+	for e in all(enemies) do
+		enm_update(e,enemies,plr)
+	end
 end
 
 function _draw()
@@ -21,8 +39,8 @@ function _draw()
 	
 	-- draw grass
 	if not grass_drawn then
-		for x=0,map_w/8 do
-			for y=0,map_h/8 do
+		for x=0,px_to_tile(map_w) do
+			for y=0,px_to_tile(map_h) do
 				local n=mget(x,y)
 				local r=rnd(100)
 				local sprs={2,3,4}
@@ -37,6 +55,10 @@ function _draw()
 	camera(cam.x,cam.y)
 	
 	plr_draw(plr)
+	
+	for e in all(enemies) do
+		enm_draw(e)
+	end
 	
 	debug_draw(cam.x,cam.y)
 end
@@ -231,10 +253,33 @@ end
 -- utils --
 
 -- constants --
+
 screen_size=128
 tile_size=8
 map_h=512
 map_w=1024
+map_th=map_h/8
+map_tw=map_w/8
+max_int=32767
+
+-- pixel/tile --
+function px_to_tile(n)
+	return flr(n/8)
+end
+
+function tile_to_px(n)
+	return n*8
+end
+
+-- shuffle --
+function shuffle(tbl)
+  local n = #tbl
+  for i = n, 2, -1 do
+    local j = flr(rnd(i)) + 1
+    tbl[i], tbl[j] = tbl[j], tbl[i]
+  end
+  return tbl
+end
 
 -- animation --
 
@@ -326,10 +371,10 @@ end
 _debug_msgs={}
 
 function debug(str)
-	add(_debug_msgs,str)
+	add(_debug_msgs,tostr(str))
 	
 	if #_debug_msgs>15 then
-		del(#_debug_msgs,_debug_msgs[1])
+		del(_debug_msgs,_debug_msgs[1])
 	end
 end
 
@@ -342,8 +387,60 @@ function debug_draw(x,y)
 		print("\#0\f7"..msg,x,y)
 	end
 end
+
+-- collision
+
+function col_map(a)
+	local s=tile_size
+	local corners={
+		{x=a.x,y=a.y},
+		{x=a.x+s,y=a.y},
+		{x=a.x,y=a.y+s},
+		{x=a.x+s,y=a.y+s}
+	}
+	for c in all(corners) do
+		local x=px_to_tile(c.x)
+		local y=px_to_tile(c.y)
+		local n=mget(x,y)
+		local collides=fget(n,0)
+		
+		if collides then
+			return true
+		end
+	end
+
+	return false
+end
+
+function col_ab(a,b)
+	local s=tile_size
+ return
+ 	a.x<b.x+s and -- a's left is left of b's right
+ 	a.x+s>b.x and -- a's right is right of b's left
+ 	a.y<b.y+s and -- a's top is above b's bottom
+ 	a.y+s>b.y     -- a's bottom is below b's top
+end
+
+function col_ax(a,x)
+	for b in all(x) do
+ 	if b~= a then
+ 		if col_ab(a,b) then
+ 			return true
+ 		end
+ 	end
+ end
+ 
+ return false
+end
 -->8
 -- atk --
+
+-- types of attack
+-- punch
+-- football
+-- fireball
+-- aurea
+--	bite
 
 function atk_new(plr)
 	local x=plr.x
@@ -423,6 +520,124 @@ function atk_mk_ani(atk)
 	ani_start(ani)
 	return ani
 end
+-->8
+-- enemy --
+
+function enm_new(cam,x,y,atk,spd)
+	local coord=enm_get_spawn_coord(cam)
+	
+	local e={
+		x=x or coord.x,
+		y=y or coord.y,
+		spr=23,
+		atk=atk or 1,
+		spd=spd or .2
+	}
+	
+	e.ani=enm_mk_ani(e)
+	
+	return e
+end
+
+function enm_update(enm,enms,plr)
+	ani_update(enm.ani)
+	
+	local spd_x=enm.spd
+	local spd_y=enm.spd
+	local diff_x=plr.x-enm.x
+	local diff_y=plr.y-enm.y
+	local dir_x=1
+	local dir_y=1
+	
+	if diff_x<0 then
+		diff_x*=-1
+		dir_x=-1
+	end
+	
+	if diff_y<0 then
+		diff_y*=-1
+		dir_y=-1
+	end
+	
+	if diff_x<spd_x then
+		spd_x=diff_x
+	end
+	
+	if diff_y<spd_y then
+		spd_y=diff_y
+	end
+	
+	enm.x+=spd_x*dir_x
+	
+	if col_map(enm) or
+				col_ax(enm,enms) or
+				col_ab(enm,plr) then
+		enm.x-=spd_x*dir_x
+	end
+	
+	enm.y+=spd_y*dir_y
+	
+	if col_map(enm) or
+				col_ax(enm,enms) or
+				col_ab(enm,plr) then
+		enm.y-=spd_y*dir_y
+	end
+end
+
+function enm_draw(enm)
+	spr(enm.spr,enm.x,enm.y)
+end
+
+function enm_mk_ani(e)
+	local a=ani_new(12,true)
+	ani_add(a,function()
+		e.spr=24
+	end)
+	ani_add(a,function()
+		e.spr=25
+	end)
+	ani_add(a,function()
+		e.spr=24
+	end)
+	ani_add(a,function()
+		e.spr=23
+	end)
+	ani_start(a)
+	return a
+end
+
+function enm_get_spawn_coord(cam)
+	local x=flr(rnd(16))
+	local y=flr(rnd(16))
+	
+	if flr(rnd(2))==0 then
+		x=rnd({-1,16})
+	else
+		y=rnd({-1,16})
+	end
+	
+	x=px_to_tile(cam.x)+x
+	y=px_to_tile(cam.y)+y
+	
+	if x<0 or
+				x>map_tw or
+				y<0 or
+				y>map_tw then
+		return enm_get_spawn_coord(cam)
+	end
+	
+	local t=mget(x,y)
+	local f=fget(t,0)
+	
+	if f then
+		return enm_get_spawn_coord(cam)
+	end
+	
+	return {
+		x=tile_to_px(x),
+		y=tile_to_px(y)
+	}
+end
 __gfx__
 00000000bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb94bbbbb44bbbbb49bbbbb999999bbbbb94bbbb49bbbbbbbbbbbbbbbbbbbb000000000000000000000000
 00000000bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb944b94bbbbb44bbbbb49b449b444444bbbbb94bbbb49bbbbbbbbbbbbbbbbbbbb000000000000000000000000
@@ -432,14 +647,14 @@ __gfx__
 00700700bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb944444bbb444444bbb44444944444444bbbbbbbbbbbbbbbbbbbb94444449bbbb000000000000000000000000
 00000000bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb944b94bbb444444bbb49b449bbb44bbbbbbbbbbbbbbbbbbbbbbb94bbbb49bbbb000000000000000000000000
 00000000bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb94bbb999999bbb49bbbbbbb44bbbbbbbbbbbbbbbbbbbbbbb94bbbb49bbbb000000000000000000000000
-bbb1115454444bbb00000000000000000077000000007000089001d0000000000000000000000000000000000000000000000000000000000000000000000000
-bb111155444454bb000000000700000000077000000000709a78dc7d000000000000000000000000000000000000000000000000000000000000000000000000
-b11111254545454b070000000070000000007700000000008aa91cc1000000000000000000000000000000000000000000000000000000000000000000000000
-11111122545454540070000000770000000007700000000709800d10000000000000000000000000000000000000000000000000000000000000000000000000
-11111122254545450700000000770000000007700000000707600330000000000000000000000000000000000000000000000000000000000000000000000000
-11111672225555550000000000700000000077000000000075763ba3000000000000000000000000000000000000000000000000000000000000000000000000
-11116677222555550000000007000000000770000000007067573bb3000000000000000000000000000000000000000000000000000000000000000000000000
-11168678722677770000000000000000007700000000700006700330000000000000000000000000000000000000000000000000000000000000000000000000
+bbb1115454444bbb00000000000000000077000000007000089001d0000077000000770000007700000000000000000000000000000000000000000000000000
+bb111155444454bb000000000700000000077000000000709a78dc7d000777700007777000077770000000000000000000000000000000000000000000000000
+b11111254545454b070000000070000000007700000000008aa91cc1070799900707999007079990000000000000000000000000000000000000000000000000
+11111122545454540070000000770000000007700000000709800d10677766006777660067776600000000000000000000000000000000000000000000000000
+11111122254545450700000000770000000007700000000707600330677777706777777067777770000000000000000000000000000000000000000000000000
+11111672225555550000000000700000000077000000000075763ba3667777606677776066777760000000000000000000000000000000000000000000000000
+11116677222555550000000007000000000770000000007067573bb3066676690666766009667660000000000000000000000000000000000000000000000000
+11168678722677770000000000000000007700000000700006700330009000000900009000000900000000000000000000000000000000000000000000000000
 11686117872688880070700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 16886117887728880007000007000700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 68888778888722880000000000777000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
