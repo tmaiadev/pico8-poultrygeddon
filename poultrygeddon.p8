@@ -24,7 +24,7 @@ function _update60()
 		add(enemies, enm_new(cam))
 	end
 	
-	plr_update(plr)
+	plr_update(plr,enemies)
 	cam_follow(cam,plr)
 	
 	for e in all(enemies) do
@@ -69,6 +69,14 @@ function plr_new(x,y)
 	local plr={
 		x=x or 0,
 		y=y or 0,
+		w=tile_size,
+		h=tile_size,
+		hitbox={
+			r=2,
+			l=3,
+			t=3,
+			b=0
+		},
 		spr=48,
 		dir="➡️",
 		flip_x=false,
@@ -122,7 +130,7 @@ function plr_update(plr)
 			plr.flip_x=false
 		end
 		
-		if plr_collides_map(plr) then
+		if col_map(plr) then
 			plr.x=original_x
 		end
 		
@@ -134,7 +142,7 @@ function plr_update(plr)
 			plr.y+=mv_speed
 		end
 		
-		if plr_collides_map(plr) then
+		if col_map(plr) then
 			plr.y=original_y
 		end
 	else
@@ -182,72 +190,6 @@ function plr_mk_running_ani(plr)
 	ani_start(ani)
 	
 	return ani
-end
-
-function plr_hitbox(plr)
-	local x=plr.x
-	local y=plr.y
-
-	local l=x+2           -- left
-	local r=x+tile_size-3 -- right
-	local t=y+3           -- top
-	local b=y+tile_size   -- bottom
-	
-	local h=b-t -- height
-	local w=r-l -- width
-	
-	local c={             -- center
-		x=l+(w/2),
-		y=t+(h/2)
-	}
-	
-	local tl={x=l,y=t}   -- top left
-	local tc={x=c.x,y=t} -- top center
-	local tr={x=r,y=t}   -- top right
-	
-	local cl={x=l,y=c.y} -- center left
-	local cr={x=r,y=c.y} -- center right
-	
-	local bl={x=l,y=b}   -- bottom left
-	local bc={x=c.x,y=b} -- bottom center
-	local br={x=r,y=b}   -- bottom right
-	
-	return {
-		l=l,
-		r=r,
-		t=t,
-		b=b,
-		c=c,
-		tl=tl,
-		tc=tc,
-		tr=tr,
-		cl=cr,
-		cr=cr,
-		bl=bl,
-		bc=bc,
-		br=br
-	}
-end
-
-function plr_collides_map(plr)
-	local hb=plr_hitbox(plr)
-	local coords={
-		hb.tl,
-		hb.tr,
-		hb.bl,
-		hb.br
-	}
-	
-	for c in all(coords) do
-		local n=mget(flr(c.x/8),flr(c.y/8))
-		local collides=fget(n,0)
-		
-		if collides then
-			return true
-		end
-	end
-	
-	return false
 end
 -->8
 -- utils --
@@ -388,6 +330,73 @@ function debug_draw(x,y)
 	end
 end
 
+-- hitbox
+
+function hitbox(e)
+	assert(e.x, "`x` is mandatory")
+	assert(e.y, "`y` is mandatory")
+	
+	local x=e.x
+	local y=e.y
+	local w=e.w or tile_size
+	local h=e.h or tile_size
+	
+	local offset_l=0
+	local offset_r=0
+	local offset_t=0
+	local offset_b=0
+	local hb=e.hitbox
+	
+	if hb and
+				type(hb)=="table" then
+		offset_l=hb.l or 0
+		offset_r=hb.r or 0
+		offset_t=hb.u or 0
+		offset_b=hb.b or 0
+		
+		if hb.x then
+			offset_l=hb.x
+			offset_r=hb.x
+		end
+		
+		if hb.y then
+			offset_t=hb.y
+			offset_b=hb.y
+		end
+	end
+	
+	local l=x+offset_l
+	local r=x+w-offset_r
+	local t=y+offset_t
+	local b=y+h-offset_b
+	local c={x=l+(w/2),y=t+(h/2)}
+	
+	local tl={x=l,y=t}
+	local tc={x=c.x,y=t}
+	local tr={x=r,y=t}
+	local cl={x=l,y=c.y}
+	local cr={x=r,y=c.y}
+	local bl={x=l,y=b}
+	local bc={x=c.x,y=b}
+	local br={x=r,y=b}
+	
+	return {
+		l=l,
+		r=r,
+		t=t,
+		b=b,
+		c=c,
+		tl=tl,
+		tc=tc,
+		tr=tr,
+		cl=cl,
+		cr=cr,
+		bl=bl,
+		bc=bc,
+		br=br
+	}
+end
+
 -- collision
 
 function col_map(a)
@@ -413,24 +422,25 @@ function col_map(a)
 end
 
 function col_ab(a,b)
-	local s=tile_size
+	local a=hitbox(a)
+	local b=hitbox(b)
  return
- 	a.x<b.x+s and -- a's left is left of b's right
- 	a.x+s>b.x and -- a's right is right of b's left
- 	a.y<b.y+s and -- a's top is above b's bottom
- 	a.y+s>b.y     -- a's bottom is below b's top
+ 	a.l<b.r and -- a's left is left of b's right
+ 	a.r>b.l and -- a's right is right of b's left
+ 	a.t<b.b and -- a's top is above b's bottom
+ 	a.b>b.t     -- a's bottom is below b's top
 end
 
 function col_ax(a,x)
 	for b in all(x) do
  	if b~= a then
  		if col_ab(a,b) then
- 			return true
+ 			return b
  		end
  	end
  end
  
- return false
+ return nil
 end
 -->8
 -- atk --
@@ -460,12 +470,14 @@ function atk_new(plr)
 	local atk={
 		x=x,
 		y=y,
+		w=tile_size,
+		h=tile_size,
 		spr=nil,
 		flip_x=plr.dir=="⬅️",
 		flip_y=plr.dir=="⬆️",
 		dir=dir,
 		plr=plr,
-		speed=.5
+		spd=.5
 	}
 	
 	atk.ani=atk_mk_ani(atk)
@@ -483,13 +495,20 @@ function atk_update(atk)
 	end
 
 	if atk.dir=="➡️" then
-		atk.x+=atk.speed
+		atk.x+=atk.spd
 	elseif atk.dir=="⬅️" then
-		atk.x-=atk.speed
+		atk.x-=atk.spd
 	elseif atk.dir=="⬆️" then
-		atk.y-=atk.speed
+		atk.y-=atk.spd
 	elseif atk.dir=="⬇️" then
-		atk.y+=atk.speed
+		atk.y+=atk.spd
+	end
+	
+	assert(enemies, "`enemies` is not globally available")
+	
+	local hit_enemy=col_ax(atk,enemies)
+	if hit_enemy then
+		del(enemies,hit_enemy)
 	end
 end
 
@@ -529,6 +548,8 @@ function enm_new(cam,x,y,atk,spd)
 	local e={
 		x=x or coord.x,
 		y=y or coord.y,
+		w=tile_size,
+		h=tile_size,
 		spr=23,
 		atk=atk or 1,
 		spd=spd or .2
