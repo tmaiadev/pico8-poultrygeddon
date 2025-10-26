@@ -22,6 +22,7 @@ function _update60()
 	-- every 2 secs
 	if dlt%120==0 then
 		add(enemies, enm_new(cam))
+		debug(#enemies,true)
 	end
 	
 	plr_update(plr,enemies)
@@ -312,7 +313,11 @@ end
 -- debug --
 _debug_msgs={}
 
-function debug(str)
+function debug(str,clear_msgs)
+	if clear_msgs then
+		_debug_msgs={}
+	end
+	
 	add(_debug_msgs,tostr(str))
 	
 	if #_debug_msgs>15 then
@@ -369,6 +374,10 @@ function hitbox(e)
 	local r=x+w-offset_r
 	local t=y+offset_t
 	local b=y+h-offset_b
+	
+	w=r-l
+	h=b-t
+	
 	local c={x=l+(w/2),y=t+(h/2)}
 	
 	local tl={x=l,y=t}
@@ -400,12 +409,12 @@ end
 -- collision
 
 function col_map(a)
-	local s=tile_size
+	a=hitbox(a)
 	local corners={
-		{x=a.x,y=a.y},
-		{x=a.x+s,y=a.y},
-		{x=a.x,y=a.y+s},
-		{x=a.x+s,y=a.y+s}
+		a.tl,
+		a.tr,
+		a.bl,
+		a.br
 	}
 	for c in all(corners) do
 		local x=px_to_tile(c.x)
@@ -470,6 +479,10 @@ function atk_new(plr)
 	local atk={
 		x=x,
 		y=y,
+		hitbox={
+			x=4,
+			y=4
+		},
 		w=tile_size,
 		h=tile_size,
 		spr=nil,
@@ -542,7 +555,7 @@ end
 -->8
 -- enemy --
 
-function enm_new(cam,x,y,atk,spd)
+function enm_new(cam,atk,spd,x,y)
 	local coord=enm_get_spawn_coord(cam)
 	
 	local e={
@@ -550,9 +563,16 @@ function enm_new(cam,x,y,atk,spd)
 		y=y or coord.y,
 		w=tile_size,
 		h=tile_size,
+		hitbox={
+			x=1,
+			t=3,
+			b=0
+		},
 		spr=23,
 		atk=atk or 1,
-		spd=spd or .2
+		spd=spd or .2,
+		tgt=nil,
+		dlt=1
 	}
 	
 	e.ani=enm_mk_ani(e)
@@ -561,12 +581,29 @@ function enm_new(cam,x,y,atk,spd)
 end
 
 function enm_update(enm,enms,plr)
+	enm.dlt+=1
+	
+	if enm.dlt>max_int then
+		enm.dlt=1
+	end
+	
+	-- seek player every
+	-- 1 to 2 seconds
+	local xsecs=60+flr(rnd(60))
+	if enm.dlt%xsecs==0 then
+		enm.tgt={x=plr.x,y=plr.y}
+	end
+	
 	ani_update(enm.ani)
+	
+	if not enm.tgt then
+		enm.tgt={x=plr.x,y=plr.y}
+	end
 	
 	local spd_x=enm.spd
 	local spd_y=enm.spd
-	local diff_x=plr.x-enm.x
-	local diff_y=plr.y-enm.y
+	local diff_x=enm.tgt.x-enm.x
+	local diff_y=enm.tgt.y-enm.y
 	local dir_x=1
 	local dir_y=1
 	
@@ -588,19 +625,21 @@ function enm_update(enm,enms,plr)
 		spd_y=diff_y
 	end
 	
+	-- target found, search
+	-- for player again
+	if spd_x==0 and spd_y==0 then
+		enm.tgt={x=plr.x,y=plr.y}
+	end
+	
 	enm.x+=spd_x*dir_x
 	
-	if col_map(enm) or
-				col_ax(enm,enms) or
-				col_ab(enm,plr) then
+	if col_map(enm) then
 		enm.x-=spd_x*dir_x
 	end
 	
 	enm.y+=spd_y*dir_y
-	
-	if col_map(enm) or
-				col_ax(enm,enms) or
-				col_ab(enm,plr) then
+
+	if col_map(enm) then
 		enm.y-=spd_y*dir_y
 	end
 end
