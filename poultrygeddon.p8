@@ -56,8 +56,13 @@ function _draw()
 	camera(cam.x,cam.y)
 	
 	plr_draw(plr)
-	
-	for e in all(enemies) do
+
+	local sorted_enms=
+		sort(enemies,function(a,b)
+			return a.y<b.y
+		end)
+
+	for e in all(sorted_enms) do
 		enm_draw(e)
 	end
 	
@@ -214,16 +219,54 @@ function tile_to_px(n)
 	return n*8
 end
 
--- shuffle --
-function shuffle(tbl)
-  local n = #tbl
-  for i = n, 2, -1 do
-    local j = flr(rnd(i)) + 1
-    tbl[i], tbl[j] = tbl[j], tbl[i]
-  end
-  return tbl
-end
+-- sort table --
 
+function sort(t,comp_fn)
+	if #t<=1 then
+		return t
+	end
+	
+	local half=flr(#t/2)
+	local left={}
+	local right={}
+	
+	for i=1,half do
+		add(left,t[i])
+	end
+	
+	for i=half+1,#t do
+		add(right,t[i])
+	end
+	
+	left=sort(left,comp_fn)
+	right=sort(right,comp_fn)
+	
+	local result={}
+	local i=1 -- index for left
+	local j=1 -- index for right
+	
+	while i<=#left and j<=#right do
+		if comp_fn(left[i],right[j]) then
+			add(result,left[i])
+			i+=1
+		else
+			add(result,right[j])
+			j+=1
+		end
+	end
+	
+	while i<=#left do
+		add(result,left[i])
+		i+=1
+	end
+	
+	while j<=#right do
+		add(result,right[j])
+		j+=1
+	end
+	
+	return result
+end
 -- animation --
 
 function ani_new(fps,loop)
@@ -480,8 +523,8 @@ function atk_new(plr)
 		x=x,
 		y=y,
 		hitbox={
-			x=4,
-			y=4
+			x=2,
+			y=2
 		},
 		w=tile_size,
 		h=tile_size,
