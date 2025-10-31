@@ -8,6 +8,7 @@ function _init()
 		y=plr.y-(screen_size/2),
 	}
 	enemies={}
+	drops={}
 	dlt=0
 end
 
@@ -22,11 +23,14 @@ function _update60()
 	-- every 2 secs
 	if dlt%120==0 then
 		add(enemies, enm_new(cam))
-		debug(#enemies,true)
 	end
 	
 	plr_update(plr,enemies)
 	cam_follow(cam,plr)
+	
+	for d in all(drops) do
+		drop_update(d)
+	end
 	
 	for e in all(enemies) do
 		enm_update(e,enemies,plr)
@@ -53,10 +57,16 @@ function _draw()
 		grass_drawn=true
 	end
 	
+	-- draw not collected
+	-- drops above the grass
+	for d in all(drops) do
+		if not d.collected then
+			drop_draw(d)
+		end
+	end
+	
 	camera(cam.x,cam.y)
 	
-	plr_draw(plr)
-
 	local sorted_enms=
 		sort(enemies,function(a,b)
 			return a.y<b.y
@@ -65,6 +75,17 @@ function _draw()
 	for e in all(sorted_enms) do
 		enm_draw(e)
 	end
+	
+	-- draw collected
+	-- drops above enemies
+	-- but below plr
+	for d in all(drops) do
+		if d.collected then
+			drop_draw(d)
+		end
+	end
+	
+	plr_draw(plr)
 	
 	debug_draw(cam.x,cam.y)
 end
@@ -267,6 +288,7 @@ function sort(t,comp_fn)
 	
 	return result
 end
+
 -- animation --
 
 function ani_new(fps,loop)
@@ -483,6 +505,16 @@ function col_ab(a,b)
  	a.b>b.t     -- a's bottom is below b's top
 end
 
+function ccol_ab(a,b) -- circle collision
+	local dx=a.x-b.x
+	local dy=a.y-b.y
+	local dist_sq=dx*dx+dy*dy
+	local radsum=
+		(a.r or tile_size)+
+		(b.r or tile_size)
+	return dist_sq<=radsum*radsum
+end
+
 function col_ax(a,x)
 	for b in all(x) do
  	if b~= a then
@@ -493,6 +525,12 @@ function col_ax(a,x)
  end
  
  return nil
+end
+
+-- easing functions --
+
+function ease_in_out(t)
+	return t*t*(3-2*t)
 end
 -->8
 -- atk --
@@ -565,6 +603,12 @@ function atk_update(atk)
 	local hit_enemy=col_ax(atk,enemies)
 	if hit_enemy then
 		del(enemies,hit_enemy)
+		local new_drop=drop_new(
+			"exp",
+			hit_enemy.x+hit_enemy.w/2,
+			hit_enemy.y+hit_enemy.h/2
+		)
+		add(drops, new_drop)
 	end
 end
 
@@ -625,24 +669,24 @@ end
 
 function enm_update(enm,enms,plr)
 	enm.dlt+=1
-	
+
 	if enm.dlt>max_int then
 		enm.dlt=1
 	end
-	
+
 	-- seek player every
 	-- 1 to 2 seconds
 	local xsecs=60+flr(rnd(60))
 	if enm.dlt%xsecs==0 then
 		enm.tgt={x=plr.x,y=plr.y}
 	end
-	
+
 	ani_update(enm.ani)
-	
+
 	if not enm.tgt then
 		enm.tgt={x=plr.x,y=plr.y}
 	end
-	
+
 	local spd_x=enm.spd
 	local spd_y=enm.spd
 	local diff_x=enm.tgt.x-enm.x
@@ -654,7 +698,7 @@ function enm_update(enm,enms,plr)
 		diff_x*=-1
 		dir_x=-1
 	end
-	
+
 	if diff_y<0 then
 		diff_y*=-1
 		dir_y=-1
@@ -663,23 +707,23 @@ function enm_update(enm,enms,plr)
 	if diff_x<spd_x then
 		spd_x=diff_x
 	end
-	
+
 	if diff_y<spd_y then
 		spd_y=diff_y
 	end
-	
+
 	-- target found, search
 	-- for player again
 	if spd_x==0 and spd_y==0 then
 		enm.tgt={x=plr.x,y=plr.y}
 	end
-	
+
 	enm.x+=spd_x*dir_x
-	
+
 	if col_map(enm) then
 		enm.x-=spd_x*dir_x
 	end
-	
+
 	enm.y+=spd_y*dir_y
 
 	if col_map(enm) then
@@ -712,34 +756,112 @@ end
 function enm_get_spawn_coord(cam)
 	local x=flr(rnd(16))
 	local y=flr(rnd(16))
-	
+
 	if flr(rnd(2))==0 then
 		x=rnd({-1,16})
 	else
 		y=rnd({-1,16})
 	end
-	
+
 	x=px_to_tile(cam.x)+x
 	y=px_to_tile(cam.y)+y
-	
+
 	if x<0 or
 				x>map_tw or
 				y<0 or
 				y>map_tw then
 		return enm_get_spawn_coord(cam)
 	end
-	
+
 	local t=mget(x,y)
 	local f=fget(t,0)
-	
+
 	if f then
 		return enm_get_spawn_coord(cam)
 	end
-	
+
 	return {
 		x=tile_to_px(x),
 		y=tile_to_px(y)
 	}
+end
+-->8
+-- drops --
+
+function drop_new(kind,x,y)
+	local drop={
+		kind=kind, -- exp/hrt/gld
+		x=x,
+		y=y,
+		w=4,
+		h=4,
+		scale=1, -- draw scale
+		collected=false
+	}
+	
+	drop.collect_ani=
+		drop_mk_collect_ani(drop)
+	
+	return drop
+end
+
+function drop_update(drop)
+	ani_update(drop.collect_ani)
+	
+	assert(plr, "`plr` is not defined globally")
+	
+	local collided=ccol_ab(drop,plr)
+	
+	if collided then
+		drop_collect(drop)
+	end
+end
+
+function drop_draw(drop)
+	sspr(
+		6*8+4,  -- sx
+		8,      -- sy
+		drop.w, -- sw
+		drop.h, -- sh
+		drop.x, -- dx
+		drop.y, -- dy
+		drop.scale*drop.w, -- dw
+		drop.scale*drop.h  -- dh
+	)
+end
+
+function drop_collect(d)
+	d.collected=true
+	ani_start(d.collect_ani)
+end
+
+function drop_mk_collect_ani(d)
+	local a=ani_new()
+	
+	for i=1,60 do
+		local t=i/60
+		ani_add(a,function()
+			assert(plr,"`plr` is not defined globally")
+		
+			local tgt_x=plr.x+plr.w/2
+			local tgt_y=plr.y+plr.h/2
+			local src_x=d.x+d.w/2
+			local src_y=d.y+d.h/2
+			local dff_x=tgt_x-src_x
+			local dff_y=tgt_y-src_y
+			
+			d.x+=dff_x*ease_in_out(t)
+			d.y+=dff_y*ease_in_out(t)
+			d.scale=1-ease_in_out(t)
+		end)
+	end
+	
+	ani_add(a,function()
+		assert(drops, "`drops` is not defined globally")
+		del(drops,d)
+	end)
+	
+	return a
 end
 __gfx__
 00000000bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb94bbbbb44bbbbb49bbbbb999999bbbbb94bbbb49bbbbbbbbbbbbbbbbbbbb000000000000000000000000
