@@ -795,7 +795,6 @@ function drop_new(kind,x,y)
 		y=y,
 		w=4,
 		h=4,
-		scale=1, -- draw scale
 		collected=false
 	}
 	
@@ -824,9 +823,7 @@ function drop_draw(drop)
 		drop.w, -- sw
 		drop.h, -- sh
 		drop.x, -- dx
-		drop.y, -- dy
-		drop.scale*drop.w, -- dw
-		drop.scale*drop.h  -- dh
+		drop.y  -- dy
 	)
 end
 
@@ -850,16 +847,18 @@ function drop_mk_collect_ani(d)
 			local dff_x=tgt_x-src_x
 			local dff_y=tgt_y-src_y
 			
-			d.x+=dff_x*ease_in_out(t)
-			d.y+=dff_y*ease_in_out(t)
-			d.scale=1-ease_in_out(t)
+			if dff_x<=1 and
+						dff_y<=1 or
+						t==60 then
+				assert(drops, "`drops` is not defined globally")
+				del(drops,d)
+				return
+			else 
+				d.x+=dff_x*ease_in_out(t)
+				d.y+=dff_y*ease_in_out(t)
+			end
 		end)
 	end
-	
-	ani_add(a,function()
-		assert(drops, "`drops` is not defined globally")
-		del(drops,d)
-	end)
 	
 	return a
 end
