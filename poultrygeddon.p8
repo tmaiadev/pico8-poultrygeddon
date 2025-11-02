@@ -123,32 +123,113 @@ function hud_draw()
 		
 		spr(hrtspr,cam.x+x,cam.y+y)
 	end
+	
+	xp_bar_draw()
 end
 
-function cam_shake(dur)
+function xp_bar_draw()
+	assert(cam, "`cam` is not defined globally")
+	assert(plr, "`plr` is not defined globally")
+
+	-- xp bar
+	local xpb={
+		x=cam.x+96,
+		y=cam.y+2,
+		w=30,
+		h=8
+	}
+
+	-- border
+	rrectfill(
+		xpb.x,
+		xpb.y,
+		xpb.w,
+		xpb.h,
+		1,
+		4 -- brown
+	)
+
+	-- bg color
+	rrectfill(
+		xpb.x+1,
+		xpb.y+1,
+		xpb.w-2,
+		xpb.h-2,
+		0,
+		9 -- orange
+	)
+	
+	-- bar indent
+	rrectfill(
+		xpb.x+2,
+		xpb.y+2,
+		xpb.w-4,
+		xpb.h-4,
+		0,
+		5 -- dark gray
+	)
+	
+	-- bar indent bottom
+	rrectfill(
+		xpb.x+2,
+		xpb.y+3,
+		xpb.w-4,
+		xpb.h-5,
+		0,
+		4 -- brown
+	)
+	
+	-- level progress bar
+	local total=plr.lvl*2
+	local xp=plr.xp
+	local prc=xp/total
+	local full_w=xpb.w-4
+	local progress_w=full_w*prc
+	rrectfill(
+		xpb.x+2,
+		xpb.y+2,
+		progress_w,
+		xpb.h-4,
+		0,
+		12 -- blue
+	)
+end
+
+function cam_shake(shakedur,restdur)
 	assert("`cam` is not defined globally")
 
 	if cam.ani then
 		return
 	end
 
-	dur=dur or .1
+	shakedur=shakedur or .1
 	local a=ani_new()
 	local camx=cam.x
 	local camy=cam.y
 	
 	-- shake for duration
-	for i=1,60*dur do
+	for i=1,60*shakedur do
 		ani_add(a, function()
 			cam.x=camx+rnd({-1,0,1})
 			cam.y=camy+rnd({-1,0,1})
 		end)
 	end
 	
+	-- camera rest duration
+	restdur=restdur or 0
+	ani_add(a, function()
+		cam.x=camx
+		cam.y=camy
+	end,flr(restdur))
+	
 	-- restore original position
 	ani_add(a, function()
 		cam.x=camx
 		cam.y=camy
+	end,30)
+	
+	-- kill ani
+	ani_add(a, function()
 		cam.ani=nil
 	end)
 	
@@ -179,7 +260,9 @@ function plr_new(x,y)
 		dlt=0,
 		immortal=false,
 		immortal_cd=-1,
-		health=6
+		health=6,
+		lvl=1,
+		xp=0
 	}
 	
 	plr.running_ani=
@@ -317,8 +400,21 @@ function plr_hurt(plr)
 		return
 	end
 	
+	local dur=.5
+	
 	plr.health-=1
-	plr_immortal(plr,.5)
+	plr_immortal(plr,dur)
+	cam_shake(.1,.4)
+end
+
+function plr_add_xp(plr)
+	local lvl_up=plr.lvl*2
+	plr.xp+=1
+	
+	if plr.xp==lvl_up then
+		plr.xp=0
+		plr.lvl+=1
+	end
 end
 -->8
 -- utils --
@@ -1007,6 +1103,7 @@ function drop_mk_collect_ani(d)
 						dff_y<=1 or
 						t==60 then
 				assert(drops, "`drops` is not defined globally")
+				plr_add_xp(plr)
 				del(drops,d)
 				return
 			else 
