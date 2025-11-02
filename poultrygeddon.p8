@@ -20,6 +20,15 @@ function _update60()
 		dlt=1
 	end
 	
+	-- if powerup prompt
+	-- is showing, update
+	-- it, and kill update
+	-- process
+	if pwu.show then
+		pwu_update()
+		return
+	end
+	
 	-- create an enemy
 	-- every 2 secs
 	if dlt%120==0 then
@@ -98,6 +107,10 @@ function _draw()
 	plr_draw(plr)
 	
 	hud_draw()
+	
+	if pwu.show then
+		pwu_draw()
+	end
 	
 	debug_draw(cam.x,cam.y)
 end
@@ -262,7 +275,22 @@ function plr_new(x,y)
 		immortal_cd=-1,
 		health=6,
 		lvl=1,
-		xp=0
+		xp=0,
+		status={
+			-- attacks
+			punch=1,
+			bpunch=0,
+			football=0,
+			lstk=0,
+			fireball=0,
+			
+			-- upgrade
+			spd=.5,
+			atkspd=.5,
+			atkdur=2,
+			cltr=0, -- collection radius    
+			cd=2    -- cooldown 2 secs 
+		}
 	}
 	
 	plr.running_ani=
@@ -414,6 +442,10 @@ function plr_add_xp(plr)
 	if plr.xp==lvl_up then
 		plr.xp=0
 		plr.lvl+=1
+		
+		-- prompt powerup
+		-- to player
+		pwu.show=true
 	end
 end
 -->8
@@ -738,11 +770,11 @@ end
 -- atk --
 
 -- types of attack
--- punch
--- football
--- fireball
--- aurea
---	bite
+-- 1. punch
+-- 2. back punch
+-- 3. football
+-- 4. lightning strike
+-- 5. fireball
 
 function atk_new(plr)
 	local x=plr.x
@@ -1115,6 +1147,79 @@ function drop_mk_collect_ani(d)
 	
 	return a
 end
+-->8
+-- power ups --
+
+-- attacks: --
+-- punch
+-- back punch
+-- football
+-- lightning strike
+-- fireball
+
+-- upgrades: --
+-- speed
+-- atack speed
+-- atack duration
+-- collection radius
+-- decrease cooldown
+
+pwu={
+	show=false,
+	selected=1
+}
+
+function pwu_update()
+	if btnp(➡️) or btnp(⬇️) then
+		pwu.selected=2
+	end
+	
+	if btnp(⬅️) or btnp(⬆️) then
+		pwu.selected=1
+	end
+	
+	if btnp(❎) then
+		pwu.show=false
+	end
+end
+
+function pwu_draw()
+	assert(cam,"`cam` is not defined globally")
+
+	local x=cam.x+32
+	local y=cam.y+41
+	local w=68
+	local h=44
+	
+	-- draw border
+	rrect(x,y,w,h,2,4)
+	
+	-- draw bg
+	rrectfill(x+1,y+1,w-2,h-2,1,9)
+	
+	-- title
+	print("level up reward",x+3,y+3,4)
+	
+	-- option 1
+	rrect(x+3,y+10,w-6,9,2,4)
+	if pwu.selected==1 then
+		spr(29,x+4,y+11)
+	end
+	print("lightning",x+13,y+12,4)
+
+	
+	-- option 2
+	rrect(x+3,y+20,w-6,9,2,4)
+	if pwu.selected==2 then
+		spr(29,x+4,y+21)
+	end
+	print("speed",x+13,y+22,4)
+
+	-- footnote
+	print("❎ TO PROCEED",x+9,y+30,4)
+	print("🅾️ TO SKIP",x+9,y+36,4)
+
+end
 __gfx__
 00000000bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb94bbbbb44bbbbb49bbbbb999999bbbbb94bbbb49bbbbbbbbbbbbbbbbbbbb088088000880880008808800
 00000000bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb944b94bbbbb44bbbbb49b449b444444bbbbb94bbbb49bbbbbbbbbbbbbbbbbbbb800800808888008088888880
@@ -1125,11 +1230,11 @@ __gfx__
 00000000bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb944b94bbb444444bbb49b449bbb44bbbbbbbbbbbbbbbbbbbbbbb94bbbb49bbbb000000000000000000000000
 00000000bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb94bbb999999bbb49bbbbbbb44bbbbbbbbbbbbbbbbbbbbbbb94bbbb49bbbb000000000000000000000000
 bbb1115454444bbb00000000000000000077000000007000089001d0000077000000770000007700000000000050505055000655000000000000000000000000
-bb111155444454bb000000000700000000077000000000709a78dc7d000777700007777000077770000000000565656556006665000000000000000000000000
-b11111254545454b070000000070000000007700000000008aa91cc1070799900707999007079990000650000556665005005655000000000000000000000000
-11111122545454540070000000770000000007700000000709800d10677766006777660067776600006665005666656500005560000000000000000000000000
-11111122254545450700000000770000000007700000000707600330677777706777777067777770005665005665666605000000000000000000000000000000
-11111672225555550000000000700000000077000000000075763ba3667777606677776066777760000550000556666556500650000000000000000000000000
+bb111155444454bb000000000700000000077000000000709a78dc7d000777700007777000077770000000000565656556006665007700000000000000000000
+b11111254545454b070000000070000000007700000000008aa91cc1070799900707999007079990000650000556665005005655007777000000000000000000
+11111122545454540070000000770000000007700000000709800d10677766006777660067776600006665005666656500005560007777700000000000000000
+11111122254545450700000000770000000007700000000707600330677777706777777067777770005665005665666605000000007777000000000000000000
+11111672225555550000000000700000000077000000000075763ba3667777606677776066777760000550000556666556500650007700000000000000000000
 11116677222555550000000007000000000770000000007067573bb3066676690666766009667660000000005665665056650550000000000000000000000000
 11168678722677770000000000000000007700000000700006700330009000000900009000000900000000000565550055050000000000000000000000000000
 11686117872688880070700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
