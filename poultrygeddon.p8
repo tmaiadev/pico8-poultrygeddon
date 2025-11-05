@@ -11,6 +11,7 @@ function _init()
 	enemies={}
 	drops={}
 	dlt=0
+	pwu_init()
 end
 
 function _update60()
@@ -193,9 +194,9 @@ function xp_bar_draw()
 	)
 	
 	-- level progress bar
-	local total=plr.lvl*2
+	local total=plr_lvl_xp(plr.lvl)
 	local xp=plr.xp
-	local prc=xp/total
+	local prc=ceil((xp/total)*10)/10
 	local full_w=xpb.w-4
 	local progress_w=full_w*prc
 	rrectfill(
@@ -436,7 +437,7 @@ function plr_hurt(plr)
 end
 
 function plr_add_xp(plr)
-	local lvl_up=plr.lvl*2
+	local lvl_up=plr_lvl_xp(plr.lvl)
 	plr.xp+=1
 	
 	if plr.xp==lvl_up then
@@ -445,8 +446,20 @@ function plr_add_xp(plr)
 		
 		-- prompt powerup
 		-- to player
-		pwu.show=true
+		pwu_prompt()
 	end
+end
+
+-- get total xp needed
+-- to level up
+function plr_lvl_xp(lvl)
+		local total_xp=2
+		
+		for i=1,lvl do
+			total_xp*=2
+		end
+		
+		return total_xp
 end
 -->8
 -- utils --
@@ -1151,25 +1164,79 @@ end
 -- power ups --
 
 -- attacks: --
--- punch
--- back punch
--- football
--- lightning strike
--- fireball
+-- 1.  punch
+-- 2.  back punch
+-- 3.  football
+-- 4.  lightning strike
+-- 5.  fireball
 
 -- upgrades: --
--- speed
--- atack speed
--- atack duration
--- collection radius
--- decrease cooldown
+-- 6.  speed
+-- 7.  atack speed
+-- 8.  atack duration
+-- 9.  collection radius
+-- 10. decrease cooldown
 
-pwu={
-	show=false,
-	selected=1
-}
+function pwu_init()
+	pwu={
+		show=false,
+		selected=1,
+		options={}
+	}
+	
+	pwu_options={
+		{id=1,label="punch",left=4},
+		{id=2,label="back punch",left=5},
+		{id=3,label="football",left=5},
+		{id=4,label="lightning",left=5},
+		{id=5,label="fireball",left=5},
+		{id=6,label="speed",left=4},
+		{id=7,label="atk speed",left=5},
+		{id=8,label="atk duration",left=5},
+		{id=9,label="xp magnet",left=5},
+		{id=10,label="cooldown",left=5}
+	}
+end
+
+function pwu_prompt()
+	assert(pwu, "`pwu` is not initialised")
+	assert(pwu_options, "`pwu` is not initialised")
+
+	pwu.show=true
+	pwu.selected=1
+	
+	local atks={}
+	local upgrades={}
+	
+	for o in all(pwu_options) do
+		if o.left>0 then
+			if o.id<=5 then
+				add(atks,o)
+			else
+				add(upgrades,o)
+			end
+		end
+	end
+	
+	local health={id=11,label="health"}
+	
+	if #atks==0 then
+		add(atks,health)
+	end
+	
+	if #upgrades==0 then
+		add(upgrades,health)
+	end
+
+	pwu.options={
+		rnd(atks),
+		rnd(upgrades)
+	}
+end
 
 function pwu_update()
+	assert(pwu, "`pwu` is not initialised")
+
 	if btnp(➡️) or btnp(⬇️) then
 		pwu.selected=2
 	end
@@ -1178,12 +1245,17 @@ function pwu_update()
 		pwu.selected=1
 	end
 	
+	if btnp(🅾️) then
+		pwu.show=false
+	end
+	
 	if btnp(❎) then
 		pwu.show=false
 	end
 end
 
 function pwu_draw()
+	assert(pwu, "`pwu` is not initialised")
 	assert(cam,"`cam` is not defined globally")
 
 	local x=cam.x+32
@@ -1205,7 +1277,7 @@ function pwu_draw()
 	if pwu.selected==1 then
 		spr(29,x+4,y+11)
 	end
-	print("lightning",x+13,y+12,4)
+	print(pwu.options[1].label,x+13,y+12,4)
 
 	
 	-- option 2
@@ -1213,7 +1285,7 @@ function pwu_draw()
 	if pwu.selected==2 then
 		spr(29,x+4,y+21)
 	end
-	print("speed",x+13,y+22,4)
+	print(pwu.options[2].label,x+13,y+22,4)
 
 	-- footnote
 	print("❎ TO PROCEED",x+9,y+30,4)
